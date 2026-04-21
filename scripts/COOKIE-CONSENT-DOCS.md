@@ -136,7 +136,7 @@ All attributes are optional:
 | Attribute | Default | Description | Example |
 |-----------|---------|-------------|---------|
 | `nf-trigger` | `false` | Enable floating trigger button (`.cookies_trigger` element) | `nf-trigger="true"` |
-| `nf-optout` | `false` | Enable opt-out mode (all cookies on by default) | `nf-optout="true"` |
+| `nf-optout` | `false` | Consent mode: `"true"` for opt-out, `"geo"` for geo-based | `nf-optout="geo"` |
 | `nf-consent-expiry` | `30` | Days until consent expires | `nf-consent-expiry="90"` |
 | `nf-consent-version` | `1.0` | Version of privacy policy | `nf-consent-version="2.0"` |
 
@@ -155,6 +155,11 @@ All attributes are optional:
 **Opt-out Mode:**
 ```html
 <script src="cookies.js" nf-optout="true" nf-trigger="true"></script>
+```
+
+**Geo-based Mode (opt-in for EU/EEA, opt-out elsewhere):**
+```html
+<script src="cookies.js" nf-optout="geo" nf-trigger="true"></script>
 ```
 
 **Custom Expiry & Versioning:**
@@ -414,6 +419,14 @@ if (consent && consent.categories.includes('marketing')) {
 2. User can ignore (implicit consent) or click **Reject** to opt-out
 3. User clicks **Customize** → Disable specific categories
 
+### Geo-based Mode (`nf-optout="geo"`)
+1. User visits site → Geo-IP lookup determines visitor region (cached for 24h)
+2. **EU/EEA/UK/Switzerland visitors** → Opt-in behavior (scripts blocked until consent)
+3. **All other visitors** → Opt-out behavior (scripts load immediately)
+4. If geo lookup fails → Defaults to opt-in (GDPR-safe fallback)
+
+**Covered GDPR jurisdictions:** AT, BE, BG, HR, CY, CZ, DK, EE, FI, FR, DE, GR, HU, IE, IT, LV, LT, LU, MT, NL, PL, PT, RO, SK, SI, ES, SE, IS, LI, NO, GB, CH
+
 ---
 
 ## Consent Management
@@ -483,6 +496,18 @@ Stored data structure:
   "clearCookiesOnLoad": false
 }
 ```
+
+### localStorage Key: `nf-geo-region` (Geo mode only)
+
+Cached geo-IP result to avoid repeated API calls:
+```json
+{
+  "countryCode": "US",
+  "timestamp": 1713700000000
+}
+```
+
+Cache expires after 24 hours, then a fresh lookup is performed.
 
 ---
 

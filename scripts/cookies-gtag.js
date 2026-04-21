@@ -6,9 +6,49 @@
 
   const currentScript = document.currentScript;
   const includeTrigger = currentScript?.getAttribute('nf-trigger') === 'true';
-  const isOptOut = currentScript?.getAttribute('nf-optout') === 'true';
+  const optOutMode = currentScript?.getAttribute('nf-optout') || 'false';
+  const isGeoOpt = optOutMode === 'geo';
+  let isOptOut = optOutMode === 'true';
   const consentExpiry = parseInt(currentScript?.getAttribute('nf-consent-expiry') || '30', 10);
   const consentVersion = currentScript?.getAttribute('nf-consent-version') || '1.0';
+
+  // EU/EEA + UK + Switzerland (GDPR-equivalent jurisdictions)
+  const GDPR_COUNTRIES = [
+    'AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR',
+    'HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK',
+    'SI','ES','SE','IS','LI','NO','GB','CH'
+  ];
+
+  const GEO_CACHE_KEY = 'nf-geo-region';
+  const GEO_CACHE_TTL = 24 * 60 * 60 * 1000;
+
+  async function resolveGeoOptOut() {
+    const cached = localStorage.getItem(GEO_CACHE_KEY);
+    if (cached) {
+      try {
+        const data = JSON.parse(cached);
+        if (Date.now() - data.timestamp < GEO_CACHE_TTL) {
+          return !GDPR_COUNTRIES.includes(data.countryCode);
+        }
+      } catch (e) {}
+    }
+
+    try {
+      const response = await fetch('https://ipapi.co/country_code/', {
+        signal: AbortSignal.timeout(3000)
+      });
+      const countryCode = (await response.text()).trim().toUpperCase();
+
+      localStorage.setItem(GEO_CACHE_KEY, JSON.stringify({
+        countryCode: countryCode,
+        timestamp: Date.now()
+      }));
+
+      return !GDPR_COUNTRIES.includes(countryCode);
+    } catch (e) {
+      return false;
+    }
+  }
 
   function hideElement(element) {
     if (!element) return;
@@ -472,10 +512,17 @@
     };
   }
 
+  async function start() {
+    if (isGeoOpt) {
+      isOptOut = await resolveGeoOptOut();
+    }
+    init();
+  }
+
   // Initialize when DOM is ready
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', start);
   } else {
-    init();
+    start();
   }
 })();
