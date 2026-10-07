@@ -1,5 +1,19 @@
-!function() {
+(function () {
   "use strict";
+
+  const STORAGE_KEY = "nf-cookie-consent";
+  const OPTIONAL = ["personalization", "analytics", "marketing"];
+  const ALL = ["essentials", ...OPTIONAL];
+  const BLOCKED_SCRIPT = 'script[type="text/plain"]';
+
+  const currentScript = document.currentScript;
+  const readAttr = (name) => currentScript?.getAttribute(name);
+
+  const USE_TRIGGER = readAttr("nf-trigger") === "true";
+  const OPT_OUT = readAttr("nf-optout") === "true";
+  const VERSION = readAttr("nf-consent-version") || "1.0";
+  const parsedExpiry = parseInt(readAttr("nf-consent-expiry") || "30", 10);
+  const EXPIRY_DAYS = parsedExpiry > 0 ? parsedExpiry : 30;
 
   window.dataLayer = window.dataLayer || [];
 
@@ -16,550 +30,453 @@
     wait_for_update: 500
   });
 
-  const e = (window.nf ?? {}).cookies ?? {};
-  const t = document.currentScript;
-  const n = "true" === t?.getAttribute("nf-trigger");
-  const o = "true" === t?.getAttribute("nf-optout");
-  const i = parseInt(t?.getAttribute("nf-consent-expiry") || "30", 10);
-  const a = t?.getAttribute("nf-consent-version") || "1.0";
+  window.nf = window.nf || {};
+  window.nf.cookies = window.nf.cookies || {};
+  const api = window.nf.cookies;
 
-  function c(e) {
-    e && (e.style.display = "none");
-  }
+  const hide = (el) => {
+    if (el) el.style.display = "none";
+  };
 
-  function s(e) {
-    e && (e.style.display = "");
-  }
+  const show = (el) => {
+    if (el) el.style.display = "";
+  };
 
-  function r() {
-    const e = document.cookie.split(";");
-    const t = window.location.hostname;
-    const n = ["", t, `.${t}`];
-    const o = t.split(".");
+  const emit = (name, detail) =>
+    window.dispatchEvent(new CustomEvent(name, { detail }));
 
-    o.length > 2 && n.push(`.${o.slice(-2).join(".")}`);
-    o.length > 3 && n.push(`.${o.slice(-3).join(".")}`);
+  const normalize = (categories) =>
+    ALL.filter((c) => c === "essentials" || categories.includes(c));
 
-    const i = [
-      "/",
-      window.location.pathname,
-      window.location.pathname.substring(
-        0,
-        window.location.pathname.lastIndexOf("/")
-      )
-    ];
-
-    e.forEach((e => {
-      const t = e.split("=")[0].trim();
-
-      t && n.forEach((e => {
-        i.forEach((n => {
-          e && (
-            document.cookie = `${t}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${n}; domain=${e}`,
-            document.cookie = `${t}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${n}; domain=${e}; SameSite=Lax`,
-            document.cookie = `${t}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${n}; domain=${e}; SameSite=None; Secure`,
-            document.cookie = `${t}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${n}`,
-            document.cookie = `${t}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${n}; SameSite=Lax`,
-            document.cookie = `${t}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${n}; SameSite=None; Secure`
-          );
-        });
-      });
-    });
-  }
-
-  function l(e, t = !1) {
-    localStorage.setItem(
-      "nf-cookie-consent",
-      JSON.stringify({
-        categories: e,
-        timestamp: (new Date).toISOString(),
-        clearCookiesOnLoad: t,
-        version: a,
-        expiryDays: i
-      })
-    );
-  }
-
-  function d() {
-    const e = localStorage.getItem("nf-cookie-consent");
-
-    if (e) {
-      try {
-        const t = JSON.parse(e);
-
-        return function(e) {
-          if (!e || !e.timestamp) return !1;
-          if (e.version !== a) return !1;
-
-          const t = new Date(e.timestamp);
-          const n = new Date(t);
-          const o = e.expiryDays || i;
-
-          n.setDate(n.getDate() + o);
-
-          return !(new Date > n);
-        }(t)
-          ? t
-          : (localStorage.removeItem("nf-cookie-consent"), null);
-
-      } catch (e) {
-        return null;
-      }
+  function saveConsent(categories, clearCookiesOnLoad = false) {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          categories,
+          timestamp: new Date().toISOString(),
+          clearCookiesOnLoad,
+          version: VERSION,
+          expiryDays: EXPIRY_DAYS
+        })
+      );
+    } catch (err) {
+      console.error("Cookie script: could not save consent", err);
     }
+  }
 
+  function isValidConsent(consent) {
+    if (!consent || !consent.timestamp || !Array.isArray(consent.categories)) {
+      return false;
+    }
+    if (consent.version !== VERSION) return false;
+
+    const expires = new Date(consent.timestamp);
+    if (Number.isNaN(expires.getTime())) return false;
+
+    expires.setDate(expires.getDate() + (consent.expiryDays || EXPIRY_DAYS));
+    return new Date() <= expires;
+  }
+
+  function getConsent() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+
+      const consent = JSON.parse(raw);
+      if (isValidConsent(consent)) return consent;
+
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (err) {}
     return null;
   }
 
-  function u(e) {
-    e.forEach((e => {
-      document.querySelectorAll(`[nf-script="${e}"]`).forEach((e => {
-        e.querySelectorAll('script[type="text/plain"]').forEach((e => {
-          const t = document.createElement("script");
+  function clearCookies() {
+    const names = document.cookie
+      .split(";")
+      .map((c) => c.split("=")[0].trim())
+      .filter(Boolean);
+    if (!names.length) return;
 
-          Array.from(e.attributes).forEach((e => {
-            "type" !== e.name && t.setAttribute(e.name, e.value);
-          }));
+    const host = window.location.hostname;
+    const labels = host.split(".");
 
-          e.textContent && (t.textContent = e.textContent);
-          e.parentNode.replaceChild(t, e);
-        });
-      });
-    }));
-
-    const t = e.includes("analytics");
-    const n = e.includes("marketing");
-
-    const o = () => {
-      if ("function" != typeof window.clarity) {
-        return !1;
-      }
-
-      try {
-        window.clarity("consentv2", {
-          ad_Storage: n ? "granted" : "denied",
-          analytics_Storage: t ? "granted" : "denied"
-        });
-      } catch (e) {
-        console.error("Clarity consent error:", e);
-      }
-
-      return !0;
-    };
-
-    if (!o()) {
-      let e = 0;
-
-      const t = setInterval((() => {
-        e++;
-        (o() || e >= 20) && clearInterval(t);
-      }), 100);
+    const domains = new Set(["", host, `.${host}`]);
+    for (let i = 1; i <= labels.length - 2; i++) {
+      domains.add(`.${labels.slice(i).join(".")}`);
     }
 
-    window.dataLayer = window.dataLayer || [];
+    const paths = ["/"];
+    window.location.pathname
+      .split("/")
+      .filter(Boolean)
+      .reduce((acc, segment) => {
+        const next = `${acc}/${segment}`;
+        paths.push(next);
+        return next;
+      }, "");
+
+    const variants = ["", "; SameSite=Lax", "; SameSite=None; Secure"];
+    const expired = "expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
+    names.forEach((name) => {
+      paths.forEach((path) => {
+        domains.forEach((domain) => {
+          const domainPart = domain ? `; domain=${domain}` : "";
+          variants.forEach((variant) => {
+            document.cookie = `${name}=; ${expired}; path=${path}${domainPart}${variant}`;
+          });
+        });
+      });
+    });
+  }
+
+  function updateGtagConsent(categories) {
+    const granted = (category) =>
+      categories.includes(category) ? "granted" : "denied";
 
     gtag("consent", "update", {
-      ad_storage: n ? "granted" : "denied",
-      ad_user_data: n ? "granted" : "denied",
-      ad_personalization: n ? "granted" : "denied",
-      analytics_storage: t ? "granted" : "denied",
-      personalization_storage: e.includes("personalization")
-        ? "granted"
-        : "denied"
+      ad_storage: granted("marketing"),
+      ad_user_data: granted("marketing"),
+      ad_personalization: granted("marketing"),
+      analytics_storage: granted("analytics"),
+      personalization_storage: granted("personalization")
     });
-
-    window.dataLayer.push({
-      event: "cookie_consent_update"
-    });
-
-    window.dispatchEvent(
-      new CustomEvent("nf-consent-updated", {
-        detail: {
-          categories: e
-        }
-      })
-    );
   }
 
-  function p(e, t = !1, n, o) {
-    const i = e.querySelector('[nf-cc="options-trigger"]');
-    const a = e.querySelector('[nf-cc="options-save"]');
-    const r = e.querySelectorAll(".cookies_card_option_toggle");
-    const d = e.querySelector('[nf-cc="accept"]');
-    const p = e.querySelector('[nf-cc="reject"]');
-    const f = e.querySelector('[nf-cc="essentials"]');
+  function updateClarityConsent(categories) {
+    const send = () => {
+      if (typeof window.clarity !== "function") return false;
+      try {
+        window.clarity("consentv2", {
+          ad_Storage: categories.includes("marketing") ? "granted" : "denied",
+          analytics_Storage: categories.includes("analytics")
+            ? "granted"
+            : "denied"
+        });
+      } catch (err) {
+        console.error("Clarity consent error:", err);
+      }
+      return true;
+    };
 
-    if (f) {
-      f.classList.add("option-active");
+    if (send()) return;
 
-      const e = f.querySelector(".cookies_card_option_toggle");
+    let attempts = 0;
+    const timer = setInterval(() => {
+      attempts++;
+      if (send() || attempts >= 20) clearInterval(timer);
+    }, 100);
+  }
 
-      e && (
-        e.style.pointerEvents = "none",
-        e.style.opacity = "0.5"
+  function activateScripts(categories) {
+    categories.forEach((category) => {
+      document
+        .querySelectorAll(`[nf-script="${category}"]`)
+        .forEach((container) => {
+          const blocked = container.matches(BLOCKED_SCRIPT)
+            ? [container]
+            : container.querySelectorAll(BLOCKED_SCRIPT);
+
+          blocked.forEach((oldScript) => {
+            const newScript = document.createElement("script");
+
+            Array.from(oldScript.attributes).forEach((attr) => {
+              if (attr.name !== "type") {
+                newScript.setAttribute(attr.name, attr.value);
+              }
+            });
+
+            if (oldScript.textContent) {
+              newScript.textContent = oldScript.textContent;
+            }
+            oldScript.parentNode.replaceChild(newScript, oldScript);
+          });
+        });
+    });
+  }
+
+  function applyConsent(categories, { gtagAlreadySent = false } = {}) {
+    activateScripts(categories);
+    updateClarityConsent(categories);
+
+    if (!gtagAlreadySent) updateGtagConsent(categories);
+
+    window.dataLayer.push({ event: "cookie_consent_update" });
+    emit("nf-consent-updated", { categories });
+  }
+
+  const storedAtLoad = getConsent();
+  let gtagSentEarly = false;
+
+  if (storedAtLoad) {
+    if (storedAtLoad.clearCookiesOnLoad) {
+      clearCookies();
+
+      try {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({ ...storedAtLoad, clearCookiesOnLoad: false })
+        );
+      } catch (err) {}
+    }
+    updateGtagConsent(storedAtLoad.categories);
+    gtagSentEarly = true;
+  }
+
+  function setupAccessibility(card) {
+    const toggles = card.querySelectorAll(".cookies_card_option_toggle");
+    const optionsPanel = card.querySelector('[nf-cc="options"]');
+    const actionsPanel = card.querySelector('[nf-cc="actions"]');
+
+    const syncTabindex = () => {
+      const optionsOpen = card.classList.contains("options-open");
+      const essentialsToggle = card.querySelector(
+        '[nf-cc="essentials"] .cookies_card_option_toggle'
       );
-    }
 
-    if (n && o) {
-      ["personalization", "analytics", "marketing"].forEach((t => {
-        const n = e.querySelector(`[nf-cc="${t}"]`);
+      const optionToggles = Array.from(
+        optionsPanel?.querySelectorAll(".cookies_card_option_toggle") || []
+      ).filter((el) => el !== essentialsToggle);
+      const optionButtons = optionsPanel?.querySelectorAll("button") || [];
+      const actionButtons = actionsPanel?.querySelectorAll("button") || [];
 
-        n &&
-          !n.classList.contains("option-active") &&
-          n.classList.add("option-active");
-      }));
-    }
+      const optionsIndex = optionsOpen ? "0" : "-1";
+      const actionsIndex = optionsOpen ? "-1" : "0";
 
-    !function(e) {
-      const t = e.querySelectorAll(".cookies_card_option_toggle");
-      const n = e.querySelector('[nf-cc="options"]');
-      const o = e.querySelector('[nf-cc="actions"]');
+      optionToggles.forEach((el) => el.setAttribute("tabindex", optionsIndex));
+      optionButtons.forEach((el) => el.setAttribute("tabindex", optionsIndex));
+      actionButtons.forEach((el) => el.setAttribute("tabindex", actionsIndex));
 
-      const i = () => {
-        const t = e.classList.contains("options-open");
-        const i = e.querySelector('[nf-cc="essentials"]');
-        const a = i?.querySelector(".cookies_card_option_toggle");
-        const c = Array.from(
-          n?.querySelectorAll(".cookies_card_option_toggle") || []
-        ).filter((e => e !== a));
+      essentialsToggle?.setAttribute("tabindex", "-1");
+    };
 
-        const s = n?.querySelectorAll("button") || [];
-        const r = o?.querySelectorAll("button") || [];
+    syncTabindex();
+    new MutationObserver(syncTabindex).observe(card, {
+      attributes: true,
+      attributeFilter: ["class"]
+    });
 
-        a && a.setAttribute("tabindex", "-1");
+    toggles.forEach((toggle) => {
+      if (!toggle.hasAttribute("role")) toggle.setAttribute("role", "switch");
 
-      t
-        ? (
-            c.forEach((e => e.setAttribute("tabindex", "0"))),
-            s.forEach((e => e.setAttribute("tabindex", "0"))),
-            r.forEach((e => e.setAttribute("tabindex", "-1")))
-          )
-        : (
-            c.forEach((e => e.setAttribute("tabindex", "-1"))),
-            s.forEach((e => e.setAttribute("tabindex", "-1"))),
-            r.forEach((e => e.setAttribute("tabindex", "0")))
-          );
+      toggle.addEventListener("keydown", (event) => {
+        if (event.key === " " || event.key === "Enter") {
+          event.preventDefault();
+          toggle.click();
+        }
+      });
+
+      const option = toggle.closest(".cookies_card_option");
+
+      const syncChecked = () => {
+        toggle.setAttribute(
+          "aria-checked",
+          option?.classList.contains("option-active") ? "true" : "false"
+        );
       };
 
-      i();
+      syncChecked();
+      if (option) {
+        new MutationObserver(syncChecked).observe(option, {
+          attributes: true,
+          attributeFilter: ["class"]
+        });
+      }
+    });
 
-      new MutationObserver(i).observe(e, {
-        attributes: !0,
-        attributeFilter: ["class"]
-      });
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") card.classList.remove("options-open");
+    });
 
-      t.forEach((e => {
-        e.addEventListener("keydown", (t => {
-          (" " !== t.key && "Enter" !== t.key) ||
-            (t.preventDefault(), e.click());
-        }));
+    new MutationObserver(() => {
+      if (card.style.display === "none") return;
 
-        const t = () => {
-          const t = e.closest(".cookies_card_option");
-          const n = t?.classList.contains("option-active");
-
-          e.setAttribute(
-            "aria-checked",
-            n ? "true" : "false"
-          );
-        };
-
-        t();
-
-        const n = new MutationObserver(t);
-        const o = e.closest(".cookies_card_option");
-
-        o &&
-          n.observe(o, {
-            attributes: !0,
-            attributeFilter: ["class"]
-          });
-      }));
-
-      e.addEventListener("keydown", (t => {
-        "Escape" === t.key &&
-          e.classList.add("options-open");
-      }));
-
-      new MutationObserver((() => {
-        if ("none" !== e.style.display) {
-          const t = e.querySelector(
-            'button:not([disabled]):not([tabindex="-1"])'
-          );
-
-          t &&
-            setTimeout((() => t.focus()), 100);
-        }
-      })).observe(e, {
-        attributes: !0,
-        attributeFilter: ["style"]
-      });
-
-    }(e);
-
-    i &&
-      i.addEventListener("click", (() => {
-        e.classList.add("options-open");
-
-        window.dispatchEvent(
-          new CustomEvent("nf-consent-banner-opened", {
-            detail: {
-              source: "options-trigger"
-            }
-          })
-        );
-      }));
-
-    document.querySelectorAll('[nf-cc="options-trigger"]').forEach((n => {
-      n.addEventListener("click", (n => {
-        n.preventDefault();
-
-        s(e);
-        e.classList.add("options-open");
-
-        t && c(t);
-
-        window.dispatchEvent(
-          new CustomEvent("nf-consent-banner-opened", {
-            detail: {
-              source: "external-trigger"
-            }
-          })
-        );
-      }));
-    }));
-
-    a &&
-      a.addEventListener("click", (() => {
-        const t = function(e) {
-          const t = ["essentials"];
-
-          [
-            "personalization",
-            "analytics",
-            "marketing"
-          ].forEach((n => {
-            const o = e.querySelector(
-              `[nf-cc="${n}"].cookies_card_option`
-            );
-
-            o &&
-              o.classList.contains("option-active") &&
-              t.push(n);
-          }));
-
-          return t;
-        }(e);
-
-        l(t, !0);
-
-        window.dispatchEvent(
-          new CustomEvent("nf-consent-banner-closed", {
-            detail: {
-              action: "save",
-              categories: t
-            }
-          })
-        );
-
-        window.location.reload();
-      }));
-
-    d &&
-      d.addEventListener("click", (() => {
-        const n = [
-          "essentials",
-          "personalization",
-          "analytics",
-          "marketing"
-        ];
-
-        l(n);
-        u(n);
-        c(e);
-        t && s(t);
-
-        window.dispatchEvent(
-          new CustomEvent("nf-consent-banner-closed", {
-            detail: {
-              action: "accept",
-              categories: n
-            }
-          })
-        );
-      }));
-
-    p &&
-      p.addEventListener("click", (() => {
-        const e = ["essentials"];
-
-        l(e, !0);
-
-        window.dispatchEvent(
-          new CustomEvent("nf-consent-banner-closed", {
-            detail: {
-              action: "reject",
-              categories: e
-            }
-          })
-        );
-
-        window.location.reload();
-      }));
-
-    r.forEach((e => {
-      e.addEventListener("click", (() => {
-        const t = e.closest(".cookies_card_option");
-
-        if (t) {
-          if ("essentials" === t.getAttribute("nf-cc")) {
-            return;
-          }
-
-          t.classList.toggle("option-active");
-        }
-      }));
-    }));
+      const target = card.querySelector(
+        'button:not([disabled]):not([tabindex="-1"])'
+      );
+      if (target) setTimeout(() => target.focus(), 100);
+    }).observe(card, { attributes: true, attributeFilter: ["style"] });
   }
 
-  function f() {
-    const t = document.querySelector('[nf-cc="card"]');
+  function setupCard(card, trigger, firstVisit) {
+    const find = (selector) => card.querySelector(selector);
 
-    if (!t) {
-      return void console.error(
+    const optionsTrigger = find('[nf-cc="options-trigger"]');
+    const saveButton = find('[nf-cc="options-save"]');
+    const acceptButton = find('[nf-cc="accept"]');
+    const rejectButton = find('[nf-cc="reject"]');
+    const essentials = find('[nf-cc="essentials"]');
+    const toggles = card.querySelectorAll(".cookies_card_option_toggle");
+
+    if (essentials) {
+      essentials.classList.add("option-active");
+
+      const essentialsToggle = essentials.querySelector(
+        ".cookies_card_option_toggle"
+      );
+      if (essentialsToggle) {
+        essentialsToggle.style.pointerEvents = "none";
+        essentialsToggle.style.opacity = "0.5";
+      }
+    }
+
+    if (OPT_OUT && firstVisit) {
+      OPTIONAL.forEach((category) => {
+        find(`[nf-cc="${category}"]`)?.classList.add("option-active");
+      });
+    }
+
+    setupAccessibility(card);
+
+    optionsTrigger?.addEventListener("click", () => {
+      card.classList.add("options-open");
+      emit("nf-consent-banner-opened", { source: "options-trigger" });
+    });
+
+    document.querySelectorAll('[nf-cc="options-trigger"]').forEach((el) => {
+      if (card.contains(el)) return;
+
+      el.addEventListener("click", (event) => {
+        event.preventDefault();
+        show(card);
+        card.classList.add("options-open");
+        hide(trigger);
+        emit("nf-consent-banner-opened", { source: "external-trigger" });
+      });
+    });
+
+    toggles.forEach((toggle) => {
+      toggle.addEventListener("click", () => {
+        const option = toggle.closest(".cookies_card_option");
+        if (!option || option.getAttribute("nf-cc") === "essentials") return;
+        option.classList.toggle("option-active");
+      });
+    });
+
+    saveButton?.addEventListener("click", () => {
+      const selected = ["essentials"];
+
+      OPTIONAL.forEach((category) => {
+        const option = find(`[nf-cc="${category}"].cookies_card_option`);
+        if (option?.classList.contains("option-active")) {
+          selected.push(category);
+        }
+      });
+
+      saveConsent(selected, true);
+      emit("nf-consent-banner-closed", { action: "save", categories: selected });
+      window.location.reload();
+    });
+
+    acceptButton?.addEventListener("click", () => {
+      saveConsent(ALL);
+      applyConsent(ALL);
+      hide(card);
+      show(trigger);
+      emit("nf-consent-banner-closed", { action: "accept", categories: ALL });
+    });
+
+    rejectButton?.addEventListener("click", () => {
+      const categories = ["essentials"];
+
+      saveConsent(categories, true);
+      emit("nf-consent-banner-closed", { action: "reject", categories });
+      window.location.reload();
+    });
+  }
+
+  function init() {
+    const card = document.querySelector('[nf-cc="card"]');
+    let trigger = document.querySelector(".cookies_trigger");
+
+    if (!card) {
+      console.error(
         'Cookie script: Cookie card ([nf-cc="card"]) not found in page'
       );
     }
 
-    t.classList.remove("options-open");
+    card?.classList.remove("options-open");
 
-    let i = document.querySelector(".cookies_trigger");
+    hide(trigger);
+    if (!USE_TRIGGER) trigger = null;
 
-    n
-      ? i && c(i)
-      : i && (
-          c(i),
-          i = null
-        );
+    const stored = getConsent();
+    const firstVisit = !stored;
 
-    const a = d();
-    const f = !a || !a.categories;
+    if (stored) {
 
-    if (a && a.categories) {
-      a.clearCookiesOnLoad &&
-        (
-          r(),
-          l(a.categories, !1)
-        );
-
-      [
-        "essentials",
-        "personalization",
-        "analytics",
-        "marketing"
-      ].forEach((e => {
-        const n = t.querySelector(`[nf-cc="${e}"]`);
-
-        n &&
-          (
-            a.categories.includes(e)
-              ? n.classList.add("option-active")
-              : n.classList.remove("option-active")
+      ALL.forEach((category) => {
+        card
+          ?.querySelector(`[nf-cc="${category}"]`)
+          ?.classList.toggle(
+            "option-active",
+            stored.categories.includes(category)
           );
-      }));
+      });
 
-      c(t);
-      i && s(i);
-      u(a.categories);
-
-    } else if (o) {
-      u([
-        "essentials",
-        "personalization",
-        "analytics",
-        "marketing"
-      ]);
+      hide(card);
+      show(trigger);
+      applyConsent(stored.categories, { gtagAlreadySent: gtagSentEarly });
+    } else if (OPT_OUT) {
+      applyConsent(ALL);
     }
 
-    p(t, i, o, f);
+    if (card) setupCard(card, trigger, firstVisit);
 
-    e.openConsent = function() {
-      s(t);
-      t.classList.add("options-open");
-      i && c(i);
-
-      window.dispatchEvent(
-        new CustomEvent("nf-consent-banner-opened", {
-          detail: {
-            source: "programmatic"
-          }
-        })
-      );
+    api.openConsent = function () {
+      if (!card) return;
+      show(card);
+      card.classList.add("options-open");
+      hide(trigger);
+      emit("nf-consent-banner-opened", { source: "programmatic" });
     };
 
-    e.getConsent = function() {
-      return d();
-    };
+    api.getConsent = getConsent;
 
-    e.updateConsent = function(e) {
-      Array.isArray(e)
-        ? (
-            l(e, !0),
-            window.location.reload()
-          )
-        : console.error(
-            "updateConsent requires an array of categories"
-          );
-    };
-
-    e.revokeConsent = function() {
-      localStorage.removeItem("nf-cookie-consent");
-      r();
+    api.updateConsent = function (categories) {
+      if (!Array.isArray(categories)) {
+        console.error("updateConsent requires an array of categories");
+        return;
+      }
+      saveConsent(normalize(categories), true);
       window.location.reload();
     };
 
-    e.acceptAll = function() {
-      const e = [
-        "essentials",
-        "personalization",
-        "analytics",
-        "marketing"
-      ];
-
-      l(e);
-      u(e);
-      c(t);
-      i && s(i);
-
-      window.dispatchEvent(
-        new CustomEvent("nf-consent-banner-closed", {
-          detail: {
-            action: "accept-all-programmatic",
-            categories: e
-          }
-        })
-      );
+    api.revokeConsent = function () {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (err) {}
+      clearCookies();
+      window.location.reload();
     };
 
-    e.rejectAll = function() {
-      const e = ["essentials"];
+    api.acceptAll = function () {
+      saveConsent(ALL);
+      applyConsent(ALL);
+      hide(card);
+      show(trigger);
+      emit("nf-consent-banner-closed", {
+        action: "accept-all-programmatic",
+        categories: ALL
+      });
+    };
 
-      l(e, !0);
+    api.rejectAll = function () {
+      const categories = ["essentials"];
 
-      window.dispatchEvent(
-        new CustomEvent("nf-consent-banner-closed", {
-          detail: {
-            action: "reject-all-programmatic",
-            categories: e
-          }
-        })
-      );
-
+      saveConsent(categories, true);
+      emit("nf-consent-banner-closed", {
+        action: "reject-all-programmatic",
+        categories
+      });
       window.location.reload();
     };
   }
 
-  "loading" === document.readyState
-    ? document.addEventListener("DOMContentLoaded", f)
-    : f();
-
-}();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
