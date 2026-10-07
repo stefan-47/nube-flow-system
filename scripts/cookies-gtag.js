@@ -227,18 +227,17 @@
 
         a && a.setAttribute("tabindex", "-1");
 
-        t
-          ? (
-              c.forEach((e => e.setAttribute("tabindex", "0"))),
-              s.forEach((e => e.setAttribute("tabindex", "0"))),
-              r.forEach((e => e.setAttribute("tabindex", "-1"))
-            )
+      t
+        ? (
+            c.forEach((e => e.setAttribute("tabindex", "0"))),
+            s.forEach((e => e.setAttribute("tabindex", "0"))),
+            r.forEach((e => e.setAttribute("tabindex", "-1")))
           )
-          : (
-              c.forEach((e => e.setAttribute("tabindex", "-1"))),
-              s.forEach((e => e.setAttribute("tabindex", "-1"))),
-              r.forEach((e => e.setAttribute("tabindex", "0"))
-            );
+        : (
+            c.forEach((e => e.setAttribute("tabindex", "-1"))),
+            s.forEach((e => e.setAttribute("tabindex", "-1"))),
+            r.forEach((e => e.setAttribute("tabindex", "0")))
+          );
       };
 
       i();
