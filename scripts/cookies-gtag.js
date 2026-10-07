@@ -1,528 +1,566 @@
-(function() {
-  'use strict';
+!function() {
+  "use strict";
 
-  // Create global namespace for programmatic access
-  const cookieSystem = ((window.nf ??= {}).cookies ??= {});
+  window.dataLayer = window.dataLayer || [];
 
-  const currentScript = document.currentScript;
-  const includeTrigger = currentScript?.getAttribute('nf-trigger') === 'true';
-  const optOutMode = currentScript?.getAttribute('nf-optout') || 'false';
-  const isGeoOpt = optOutMode === 'geo';
-  let isOptOut = optOutMode === 'true';
-  const consentExpiry = parseInt(currentScript?.getAttribute('nf-consent-expiry') || '30', 10);
-  const consentVersion = currentScript?.getAttribute('nf-consent-version') || '1.0';
-
-  // EU/EEA + UK + Switzerland (GDPR-equivalent jurisdictions)
-  const GDPR_COUNTRIES = [
-    'AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR',
-    'HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK',
-    'SI','ES','SE','IS','LI','NO','GB','CH'
-  ];
-
-  const GEO_CACHE_KEY = 'nf-geo-region';
-  const GEO_CACHE_TTL = 24 * 60 * 60 * 1000;
-
-  async function resolveGeoOptOut() {
-    const cached = localStorage.getItem(GEO_CACHE_KEY);
-    if (cached) {
-      try {
-        const data = JSON.parse(cached);
-        if (Date.now() - data.timestamp < GEO_CACHE_TTL) {
-          return !GDPR_COUNTRIES.includes(data.countryCode);
-        }
-      } catch (e) {}
-    }
-
-    try {
-      const response = await fetch('https://ipapi.co/country_code/', {
-        signal: AbortSignal.timeout(3000)
-      });
-      const countryCode = (await response.text()).trim().toUpperCase();
-
-      localStorage.setItem(GEO_CACHE_KEY, JSON.stringify({
-        countryCode: countryCode,
-        timestamp: Date.now()
-      }));
-
-      return !GDPR_COUNTRIES.includes(countryCode);
-    } catch (e) {
-      return false;
-    }
+  function gtag() {
+    window.dataLayer.push(arguments);
   }
 
-  function hideElement(element) {
-    if (!element) return;
-    element.style.display = 'none';
+  gtag("consent", "default", {
+    ad_storage: "denied",
+    ad_user_data: "denied",
+    ad_personalization: "denied",
+    analytics_storage: "denied",
+    personalization_storage: "denied",
+    wait_for_update: 500
+  });
+
+  const e = (window.nf ?? {}).cookies ?? {};
+  const t = document.currentScript;
+  const n = "true" === t?.getAttribute("nf-trigger");
+  const o = "true" === t?.getAttribute("nf-optout");
+  const i = parseInt(t?.getAttribute("nf-consent-expiry") || "30", 10);
+  const a = t?.getAttribute("nf-consent-version") || "1.0";
+
+  function c(e) {
+    e && (e.style.display = "none");
   }
 
-  function showElement(element) {
-    if (!element) return;
-    element.style.display = '';
+  function s(e) {
+    e && (e.style.display = "");
   }
 
-  function deleteAllCookies() {
-    const cookies = document.cookie.split(';');
-    const hostname = window.location.hostname;
-    const domains = ['', hostname, `.${hostname}`];
-    const parts = hostname.split('.');
+  function r() {
+    const e = document.cookie.split(";");
+    const t = window.location.hostname;
+    const n = ["", t, `.${t}`];
+    const o = t.split(".");
 
-    if (parts.length > 2) domains.push(`.${parts.slice(-2).join('.')}`);
-    if (parts.length > 3) domains.push(`.${parts.slice(-3).join('.')}`);
+    o.length > 2 && n.push(`.${o.slice(-2).join(".")}`);
+    o.length > 3 && n.push(`.${o.slice(-3).join(".")}`);
 
-    const paths = [
-      '/',
+    const i = [
+      "/",
       window.location.pathname,
-      window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'))
+      window.location.pathname.substring(
+        0,
+        window.location.pathname.lastIndexOf("/")
+      )
     ];
 
-    cookies.forEach(cookie => {
-      const name = cookie.split('=')[0].trim();
-      if (!name) return;
+    e.forEach((e => {
+      const t = e.split("=")[0].trim();
 
-      domains.forEach(domain => {
-        paths.forEach(path => {
-          if (domain) {
-            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path}; domain=${domain}`;
-            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path}; domain=${domain}; SameSite=Lax`;
-            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path}; domain=${domain}; SameSite=None; Secure`;
-          }
-          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path}`;
-          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path}; SameSite=Lax`;
-          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path}; SameSite=None; Secure`;
+      t && n.forEach((e => {
+        i.forEach((n => {
+          e && (
+            document.cookie = `${t}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${n}; domain=${e}`,
+            document.cookie = `${t}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${n}; domain=${e}; SameSite=Lax`,
+            document.cookie = `${t}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${n}; domain=${e}; SameSite=None; Secure`,
+            document.cookie = `${t}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${n}`,
+            document.cookie = `${t}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${n}; SameSite=Lax`,
+            document.cookie = `${t}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${n}; SameSite=None; Secure`
+          );
         });
       });
     });
   }
 
-  function saveConsent(categories, clearCookiesOnLoad = false) {
-    localStorage.setItem('nf-cookie-consent', JSON.stringify({
-      categories: categories,
-      timestamp: new Date().toISOString(),
-      clearCookiesOnLoad: clearCookiesOnLoad,
-      version: consentVersion,
-      expiryDays: consentExpiry
-    }));
+  function l(e, t = !1) {
+    localStorage.setItem(
+      "nf-cookie-consent",
+      JSON.stringify({
+        categories: e,
+        timestamp: (new Date).toISOString(),
+        clearCookiesOnLoad: t,
+        version: a,
+        expiryDays: i
+      })
+    );
   }
 
-  function isConsentValid(consent) {
-    if (!consent || !consent.timestamp) return false;
-    if (consent.version !== consentVersion) return false;
+  function d() {
+    const e = localStorage.getItem("nf-cookie-consent");
 
-    const consentDate = new Date(consent.timestamp);
-    const expiryDate = new Date(consentDate);
-    const daysToUse = consent.expiryDays || consentExpiry;
-    expiryDate.setDate(expiryDate.getDate() + daysToUse);
-
-    if (new Date() > expiryDate) return false;
-    return true;
-  }
-
-  function loadConsent() {
-    const stored = localStorage.getItem('nf-cookie-consent');
-    if (stored) {
+    if (e) {
       try {
-        const consent = JSON.parse(stored);
-        if (!isConsentValid(consent)) {
-          localStorage.removeItem('nf-cookie-consent');
-          return null;
-        }
-        return consent;
+        const t = JSON.parse(e);
+
+        return function(e) {
+          if (!e || !e.timestamp) return !1;
+          if (e.version !== a) return !1;
+
+          const t = new Date(e.timestamp);
+          const n = new Date(t);
+          const o = e.expiryDays || i;
+
+          n.setDate(n.getDate() + o);
+
+          return !(new Date > n);
+        }(t)
+          ? t
+          : (localStorage.removeItem("nf-cookie-consent"), null);
+
       } catch (e) {
         return null;
       }
     }
+
     return null;
   }
 
-  function signalConsent(categories) {
-    const hasAnalytics = categories.includes('analytics');
-    const hasMarketing = categories.includes('marketing');
+  function u(e) {
+    e.forEach((e => {
+      document.querySelectorAll(`[nf-script="${e}"]`).forEach((e => {
+        e.querySelectorAll('script[type="text/plain"]').forEach((e => {
+          const t = document.createElement("script");
 
-    const signalClarity = () => {
-      if (typeof window.clarity === 'function') {
-        try {
-          window.clarity('consentv2', {
-            ad_Storage: hasMarketing ? "granted" : "denied",
-            analytics_Storage: hasAnalytics ? "granted" : "denied"
-          });
-        } catch (error) {
-          console.error('Clarity consent error:', error);
-        }
-      } else {
-        return false;
+          Array.from(e.attributes).forEach((e => {
+            "type" !== e.name && t.setAttribute(e.name, e.value);
+          }));
+
+          e.textContent && (t.textContent = e.textContent);
+          e.parentNode.replaceChild(t, e);
+        });
+      });
+    }));
+
+    const t = e.includes("analytics");
+    const n = e.includes("marketing");
+
+    const o = () => {
+      if ("function" != typeof window.clarity) {
+        return !1;
       }
-      return true;
+
+      try {
+        window.clarity("consentv2", {
+          ad_Storage: n ? "granted" : "denied",
+          analytics_Storage: t ? "granted" : "denied"
+        });
+      } catch (e) {
+        console.error("Clarity consent error:", e);
+      }
+
+      return !0;
     };
 
-    if (!signalClarity()) {
-      let attempts = 0;
-      const clarityInterval = setInterval(() => {
-        attempts++;
-        if (signalClarity() || attempts >= 20) {
-          clearInterval(clarityInterval);
-        }
-      }, 100);
+    if (!o()) {
+      let e = 0;
+
+      const t = setInterval((() => {
+        e++;
+        (o() || e >= 20) && clearInterval(t);
+      }), 100);
     }
 
-    // Signal consent via dataLayer (compatible with both GTM and gtag.js)
     window.dataLayer = window.dataLayer || [];
-    function gtag() { window.dataLayer.push(arguments); }
 
-    gtag('consent', 'update', {
-      'ad_storage': hasMarketing ? 'granted' : 'denied',
-      'ad_user_data': hasMarketing ? 'granted' : 'denied',
-      'ad_personalization': hasMarketing ? 'granted' : 'denied',
-      'analytics_storage': hasAnalytics ? 'granted' : 'denied',
-      'personalization_storage': categories.includes('personalization') ? 'granted' : 'denied'
+    gtag("consent", "update", {
+      ad_storage: n ? "granted" : "denied",
+      ad_user_data: n ? "granted" : "denied",
+      ad_personalization: n ? "granted" : "denied",
+      analytics_storage: t ? "granted" : "denied",
+      personalization_storage: e.includes("personalization")
+        ? "granted"
+        : "denied"
     });
 
-    window.dataLayer.push({ event: 'cookie_consent_update' });
+    window.dataLayer.push({
+      event: "cookie_consent_update"
+    });
 
-    window.dispatchEvent(new CustomEvent('nf-consent-updated', {
-      detail: { categories: categories }
+    window.dispatchEvent(
+      new CustomEvent("nf-consent-updated", {
+        detail: {
+          categories: e
+        }
+      })
+    );
+  }
+
+  function p(e, t = !1, n, o) {
+    const i = e.querySelector('[nf-cc="options-trigger"]');
+    const a = e.querySelector('[nf-cc="options-save"]');
+    const r = e.querySelectorAll(".cookies_card_option_toggle");
+    const d = e.querySelector('[nf-cc="accept"]');
+    const p = e.querySelector('[nf-cc="reject"]');
+    const f = e.querySelector('[nf-cc="essentials"]');
+
+    if (f) {
+      f.classList.add("option-active");
+
+      const e = f.querySelector(".cookies_card_option_toggle");
+
+      e && (
+        e.style.pointerEvents = "none",
+        e.style.opacity = "0.5"
+      );
+    }
+
+    if (n && o) {
+      ["personalization", "analytics", "marketing"].forEach((t => {
+        const n = e.querySelector(`[nf-cc="${t}"]`);
+
+        n &&
+          !n.classList.contains("option-active") &&
+          n.classList.add("option-active");
+      }));
+    }
+
+    !function(e) {
+      const t = e.querySelectorAll(".cookies_card_option_toggle");
+      const n = e.querySelector('[nf-cc="options"]');
+      const o = e.querySelector('[nf-cc="actions"]');
+
+      const i = () => {
+        const t = e.classList.contains("options-open");
+        const i = e.querySelector('[nf-cc="essentials"]');
+        const a = i?.querySelector(".cookies_card_option_toggle");
+        const c = Array.from(
+          n?.querySelectorAll(".cookies_card_option_toggle") || []
+        ).filter((e => e !== a));
+
+        const s = n?.querySelectorAll("button") || [];
+        const r = o?.querySelectorAll("button") || [];
+
+        a && a.setAttribute("tabindex", "-1");
+
+        t
+          ? (
+              c.forEach((e => e.setAttribute("tabindex", "0"))),
+              s.forEach((e => e.setAttribute("tabindex", "0"))),
+              r.forEach((e => e.setAttribute("tabindex", "-1"))
+            )
+          )
+          : (
+              c.forEach((e => e.setAttribute("tabindex", "-1"))),
+              s.forEach((e => e.setAttribute("tabindex", "-1"))),
+              r.forEach((e => e.setAttribute("tabindex", "0"))
+            );
+      };
+
+      i();
+
+      new MutationObserver(i).observe(e, {
+        attributes: !0,
+        attributeFilter: ["class"]
+      });
+
+      t.forEach((e => {
+        e.addEventListener("keydown", (t => {
+          (" " !== t.key && "Enter" !== t.key) ||
+            (t.preventDefault(), e.click());
+        }));
+
+        const t = () => {
+          const t = e.closest(".cookies_card_option");
+          const n = t?.classList.contains("option-active");
+
+          e.setAttribute(
+            "aria-checked",
+            n ? "true" : "false"
+          );
+        };
+
+        t();
+
+        const n = new MutationObserver(t);
+        const o = e.closest(".cookies_card_option");
+
+        o &&
+          n.observe(o, {
+            attributes: !0,
+            attributeFilter: ["class"]
+          });
+      }));
+
+      e.addEventListener("keydown", (t => {
+        "Escape" === t.key &&
+          e.classList.add("options-open");
+      }));
+
+      new MutationObserver((() => {
+        if ("none" !== e.style.display) {
+          const t = e.querySelector(
+            'button:not([disabled]):not([tabindex="-1"])'
+          );
+
+          t &&
+            setTimeout((() => t.focus()), 100);
+        }
+      })).observe(e, {
+        attributes: !0,
+        attributeFilter: ["style"]
+      });
+
+    }(e);
+
+    i &&
+      i.addEventListener("click", (() => {
+        e.classList.add("options-open");
+
+        window.dispatchEvent(
+          new CustomEvent("nf-consent-banner-opened", {
+            detail: {
+              source: "options-trigger"
+            }
+          })
+        );
+      }));
+
+    document.querySelectorAll('[nf-cc="options-trigger"]').forEach((n => {
+      n.addEventListener("click", (n => {
+        n.preventDefault();
+
+        s(e);
+        e.classList.add("options-open");
+
+        t && c(t);
+
+        window.dispatchEvent(
+          new CustomEvent("nf-consent-banner-opened", {
+            detail: {
+              source: "external-trigger"
+            }
+          })
+        );
+      }));
+    }));
+
+    a &&
+      a.addEventListener("click", (() => {
+        const t = function(e) {
+          const t = ["essentials"];
+
+          [
+            "personalization",
+            "analytics",
+            "marketing"
+          ].forEach((n => {
+            const o = e.querySelector(
+              `[nf-cc="${n}"].cookies_card_option`
+            );
+
+            o &&
+              o.classList.contains("option-active") &&
+              t.push(n);
+          }));
+
+          return t;
+        }(e);
+
+        l(t, !0);
+
+        window.dispatchEvent(
+          new CustomEvent("nf-consent-banner-closed", {
+            detail: {
+              action: "save",
+              categories: t
+            }
+          })
+        );
+
+        window.location.reload();
+      }));
+
+    d &&
+      d.addEventListener("click", (() => {
+        const n = [
+          "essentials",
+          "personalization",
+          "analytics",
+          "marketing"
+        ];
+
+        l(n);
+        u(n);
+        c(e);
+        t && s(t);
+
+        window.dispatchEvent(
+          new CustomEvent("nf-consent-banner-closed", {
+            detail: {
+              action: "accept",
+              categories: n
+            }
+          })
+        );
+      }));
+
+    p &&
+      p.addEventListener("click", (() => {
+        const e = ["essentials"];
+
+        l(e, !0);
+
+        window.dispatchEvent(
+          new CustomEvent("nf-consent-banner-closed", {
+            detail: {
+              action: "reject",
+              categories: e
+            }
+          })
+        );
+
+        window.location.reload();
+      }));
+
+    r.forEach((e => {
+      e.addEventListener("click", (() => {
+        const t = e.closest(".cookies_card_option");
+
+        if (t) {
+          if ("essentials" === t.getAttribute("nf-cc")) {
+            return;
+          }
+
+          t.classList.toggle("option-active");
+        }
+      }));
     }));
   }
 
-  function loadScripts(categories) {
-    categories.forEach(category => {
-      const scriptContainers = document.querySelectorAll(`[nf-script="${category}"]`);
+  function f() {
+    const t = document.querySelector('[nf-cc="card"]');
 
-      scriptContainers.forEach(container => {
-        const scripts = container.querySelectorAll('script[type="text/plain"]');
-
-        scripts.forEach(oldScript => {
-          const newScript = document.createElement('script');
-
-          Array.from(oldScript.attributes).forEach(attr => {
-            if (attr.name !== 'type') {
-              newScript.setAttribute(attr.name, attr.value);
-            }
-          });
-
-          if (oldScript.textContent) {
-            newScript.textContent = oldScript.textContent;
-          }
-
-          oldScript.parentNode.replaceChild(newScript, oldScript);
-        });
-      });
-    });
-
-    signalConsent(categories);
-  }
-
-  function getActiveCategories(cookiesCard) {
-    const categories = ['essentials'];
-    const options = ['personalization', 'analytics', 'marketing'];
-
-    options.forEach(option => {
-      const optionElement = cookiesCard.querySelector(`[nf-cc="${option}"].cookies_card_option`);
-      if (optionElement && optionElement.classList.contains('option-active')) {
-        categories.push(option);
-      }
-    });
-
-    return categories;
-  }
-
-  function enhanceAccessibility(cookiesCard) {
-    const toggles = cookiesCard.querySelectorAll('.cookies_card_option_toggle');
-    const optionsWrapper = cookiesCard.querySelector('[nf-cc="options"]');
-    const actionsWrapper = cookiesCard.querySelector('[nf-cc="actions"]');
-
-    const updateFocusableElements = () => {
-      const isOptionsOpen = cookiesCard.classList.contains('options-open');
-      const essentialsOption = cookiesCard.querySelector('[nf-cc="essentials"]');
-      const essentialsToggle = essentialsOption?.querySelector('.cookies_card_option_toggle');
-      const optionsToggles = Array.from(optionsWrapper?.querySelectorAll('.cookies_card_option_toggle') || [])
-        .filter(toggle => toggle !== essentialsToggle);
-      const optionsButtons = optionsWrapper?.querySelectorAll('button') || [];
-      const actionsButtons = actionsWrapper?.querySelectorAll('button') || [];
-
-      if (essentialsToggle) {
-        essentialsToggle.setAttribute('tabindex', '-1');
-      }
-
-      if (isOptionsOpen) {
-        optionsToggles.forEach(el => el.setAttribute('tabindex', '0'));
-        optionsButtons.forEach(el => el.setAttribute('tabindex', '0'));
-        actionsButtons.forEach(el => el.setAttribute('tabindex', '-1'));
-      } else {
-        optionsToggles.forEach(el => el.setAttribute('tabindex', '-1'));
-        optionsButtons.forEach(el => el.setAttribute('tabindex', '-1'));
-        actionsButtons.forEach(el => el.setAttribute('tabindex', '0'));
-      }
-    };
-
-    updateFocusableElements();
-
-    const classObserver = new MutationObserver(updateFocusableElements);
-    classObserver.observe(cookiesCard, { attributes: true, attributeFilter: ['class'] });
-
-    toggles.forEach(toggle => {
-      toggle.addEventListener('keydown', (e) => {
-        if (e.key === ' ' || e.key === 'Enter') {
-          e.preventDefault();
-          toggle.click();
-        }
-      });
-
-      const updateAriaChecked = () => {
-        const option = toggle.closest('.cookies_card_option');
-        const isActive = option?.classList.contains('option-active');
-        toggle.setAttribute('aria-checked', isActive ? 'true' : 'false');
-      };
-
-      updateAriaChecked();
-
-      const observer = new MutationObserver(updateAriaChecked);
-      const option = toggle.closest('.cookies_card_option');
-      if (option) {
-        observer.observe(option, { attributes: true, attributeFilter: ['class'] });
-      }
-    });
-
-    cookiesCard.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        cookiesCard.classList.add('options-open');
-      }
-    });
-
-    const visibilityObserver = new MutationObserver(() => {
-      if (cookiesCard.style.display !== 'none') {
-        const firstButton = cookiesCard.querySelector('button:not([disabled]):not([tabindex="-1"])');
-        if (firstButton) {
-          setTimeout(() => firstButton.focus(), 100);
-        }
-      }
-    });
-    visibilityObserver.observe(cookiesCard, { attributes: true, attributeFilter: ['style'] });
-  }
-
-  function setupUIInteractions(cookiesCard, cookiesTrigger, isOptOut, isFirstVisit) {
-    const optionsTrigger = cookiesCard.querySelector('[nf-cc="options-trigger"]');
-    const optionsSave = cookiesCard.querySelector('[nf-cc="options-save"]');
-    const optionToggles = cookiesCard.querySelectorAll('.cookies_card_option_toggle');
-    const acceptBtn = cookiesCard.querySelector('[nf-cc="accept"]');
-    const rejectBtn = cookiesCard.querySelector('[nf-cc="reject"]');
-    const essentialsOption = cookiesCard.querySelector('[nf-cc="essentials"]');
-
-    if (essentialsOption) {
-      essentialsOption.classList.add('option-active');
-      const essentialsToggle = essentialsOption.querySelector('.cookies_card_option_toggle');
-      if (essentialsToggle) {
-        essentialsToggle.style.pointerEvents = 'none';
-        essentialsToggle.style.opacity = '0.5';
-      }
+    if (!t) {
+      return void console.error(
+        'Cookie script: Cookie card ([nf-cc="card"]) not found in page'
+      );
     }
 
-    if (isOptOut && isFirstVisit) {
-      const allOptions = ['personalization', 'analytics', 'marketing'];
-      allOptions.forEach(category => {
-        const optionElement = cookiesCard.querySelector(`[nf-cc="${category}"]`);
-        if (optionElement && !optionElement.classList.contains('option-active')) {
-          optionElement.classList.add('option-active');
-        }
-      });
-    }
+    t.classList.remove("options-open");
 
-    enhanceAccessibility(cookiesCard);
+    let i = document.querySelector(".cookies_trigger");
 
-    if (optionsTrigger) {
-      optionsTrigger.addEventListener('click', () => {
-        cookiesCard.classList.add('options-open');
-        window.dispatchEvent(new CustomEvent('nf-consent-banner-opened', {
-          detail: { source: 'options-trigger' }
-        }));
-      });
-    }
+    n
+      ? i && c(i)
+      : i && (
+          c(i),
+          i = null
+        );
 
-    const allOptionsTriggers = document.querySelectorAll('[nf-cc="options-trigger"]');
-    allOptionsTriggers.forEach(trigger => {
-      trigger.addEventListener('click', (e) => {
-        e.preventDefault();
-        showElement(cookiesCard);
-        cookiesCard.classList.add('options-open');
-        if (cookiesTrigger) {
-          hideElement(cookiesTrigger);
-        }
-        window.dispatchEvent(new CustomEvent('nf-consent-banner-opened', {
-          detail: { source: 'external-trigger' }
-        }));
-      });
-    });
+    const a = d();
+    const f = !a || !a.categories;
 
-    if (optionsSave) {
-      optionsSave.addEventListener('click', () => {
-        const activeCategories = getActiveCategories(cookiesCard);
-        saveConsent(activeCategories, true);
-        window.dispatchEvent(new CustomEvent('nf-consent-banner-closed', {
-          detail: { action: 'save', categories: activeCategories }
-        }));
-        window.location.reload();
-      });
-    }
+    if (a && a.categories) {
+      a.clearCookiesOnLoad &&
+        (
+          r(),
+          l(a.categories, !1)
+        );
 
-    if (acceptBtn) {
-      acceptBtn.addEventListener('click', () => {
-        const allCategories = ['essentials', 'personalization', 'analytics', 'marketing'];
-        saveConsent(allCategories);
-        loadScripts(allCategories);
-        hideElement(cookiesCard);
-        if (cookiesTrigger) {
-          showElement(cookiesTrigger);
-        }
-        window.dispatchEvent(new CustomEvent('nf-consent-banner-closed', {
-          detail: { action: 'accept', categories: allCategories }
-        }));
-      });
-    }
+      [
+        "essentials",
+        "personalization",
+        "analytics",
+        "marketing"
+      ].forEach((e => {
+        const n = t.querySelector(`[nf-cc="${e}"]`);
 
-    if (rejectBtn) {
-      rejectBtn.addEventListener('click', () => {
-        const essentialsOnly = ['essentials'];
-        saveConsent(essentialsOnly, true);
-        window.dispatchEvent(new CustomEvent('nf-consent-banner-closed', {
-          detail: { action: 'reject', categories: essentialsOnly }
-        }));
-        window.location.reload();
-      });
-    }
-
-    optionToggles.forEach(toggle => {
-      toggle.addEventListener('click', () => {
-        const option = toggle.closest('.cookies_card_option');
-        if (option) {
-          const category = option.getAttribute('nf-cc');
-          if (category === 'essentials') {
-            return;
-          }
-          option.classList.toggle('option-active');
-        }
-      });
-    });
-  }
-
-  function init() {
-    const cookiesCard = document.querySelector('[nf-cc="card"]');
-
-    if (!cookiesCard) {
-      console.error('Cookie script: Cookie card ([nf-cc="card"]) not found in page');
-      return;
-    }
-
-    cookiesCard.classList.remove('options-open');
-
-    let cookiesTrigger = document.querySelector('.cookies_trigger');
-
-    if (includeTrigger) {
-      if (cookiesTrigger) {
-        hideElement(cookiesTrigger);
-      }
-    } else if (cookiesTrigger) {
-      // Hide trigger permanently if nf-trigger is not enabled
-      hideElement(cookiesTrigger);
-      cookiesTrigger = null;
-    }
-
-    const savedConsent = loadConsent();
-    const isFirstVisit = !savedConsent || !savedConsent.categories;
-
-    if (savedConsent && savedConsent.categories) {
-      if (savedConsent.clearCookiesOnLoad) {
-        deleteAllCookies();
-        saveConsent(savedConsent.categories, false);
-      }
-
-      const allCategories = ['essentials', 'personalization', 'analytics', 'marketing'];
-      allCategories.forEach(category => {
-        const optionElement = cookiesCard.querySelector(`[nf-cc="${category}"]`);
-        if (optionElement) {
-          if (savedConsent.categories.includes(category)) {
-            optionElement.classList.add('option-active');
-          } else {
-            optionElement.classList.remove('option-active');
-          }
-        }
-      });
-
-      hideElement(cookiesCard);
-      if (cookiesTrigger) {
-        showElement(cookiesTrigger);
-      }
-      loadScripts(savedConsent.categories);
-    } else if (isOptOut) {
-      const allCategories = ['essentials', 'personalization', 'analytics', 'marketing'];
-      loadScripts(allCategories);
-    }
-
-    setupUIInteractions(cookiesCard, cookiesTrigger, isOptOut, isFirstVisit);
-
-    // Expose global API
-    cookieSystem.openConsent = function() {
-      showElement(cookiesCard);
-      cookiesCard.classList.add('options-open');
-      if (cookiesTrigger) {
-        hideElement(cookiesTrigger);
-      }
-      window.dispatchEvent(new CustomEvent('nf-consent-banner-opened', {
-        detail: { source: 'programmatic' }
+        n &&
+          (
+            a.categories.includes(e)
+              ? n.classList.add("option-active")
+              : n.classList.remove("option-active")
+          );
       }));
+
+      c(t);
+      i && s(i);
+      u(a.categories);
+
+    } else if (o) {
+      u([
+        "essentials",
+        "personalization",
+        "analytics",
+        "marketing"
+      ]);
+    }
+
+    p(t, i, o, f);
+
+    e.openConsent = function() {
+      s(t);
+      t.classList.add("options-open");
+      i && c(i);
+
+      window.dispatchEvent(
+        new CustomEvent("nf-consent-banner-opened", {
+          detail: {
+            source: "programmatic"
+          }
+        })
+      );
     };
 
-    cookieSystem.getConsent = function() {
-      return loadConsent();
+    e.getConsent = function() {
+      return d();
     };
 
-    cookieSystem.updateConsent = function(categories) {
-      if (!Array.isArray(categories)) {
-        console.error('updateConsent requires an array of categories');
-        return;
-      }
-      saveConsent(categories, true);
+    e.updateConsent = function(e) {
+      Array.isArray(e)
+        ? (
+            l(e, !0),
+            window.location.reload()
+          )
+        : console.error(
+            "updateConsent requires an array of categories"
+          );
+    };
+
+    e.revokeConsent = function() {
+      localStorage.removeItem("nf-cookie-consent");
+      r();
       window.location.reload();
     };
 
-    cookieSystem.revokeConsent = function() {
-      localStorage.removeItem('nf-cookie-consent');
-      deleteAllCookies();
-      window.location.reload();
+    e.acceptAll = function() {
+      const e = [
+        "essentials",
+        "personalization",
+        "analytics",
+        "marketing"
+      ];
+
+      l(e);
+      u(e);
+      c(t);
+      i && s(i);
+
+      window.dispatchEvent(
+        new CustomEvent("nf-consent-banner-closed", {
+          detail: {
+            action: "accept-all-programmatic",
+            categories: e
+          }
+        })
+      );
     };
 
-    cookieSystem.acceptAll = function() {
-      const allCategories = ['essentials', 'personalization', 'analytics', 'marketing'];
-      saveConsent(allCategories);
-      loadScripts(allCategories);
-      hideElement(cookiesCard);
-      if (cookiesTrigger) {
-        showElement(cookiesTrigger);
-      }
-      window.dispatchEvent(new CustomEvent('nf-consent-banner-closed', {
-        detail: { action: 'accept-all-programmatic', categories: allCategories }
-      }));
-    };
+    e.rejectAll = function() {
+      const e = ["essentials"];
 
-    cookieSystem.rejectAll = function() {
-      const essentialsOnly = ['essentials'];
-      saveConsent(essentialsOnly, true);
-      window.dispatchEvent(new CustomEvent('nf-consent-banner-closed', {
-        detail: { action: 'reject-all-programmatic', categories: essentialsOnly }
-      }));
+      l(e, !0);
+
+      window.dispatchEvent(
+        new CustomEvent("nf-consent-banner-closed", {
+          detail: {
+            action: "reject-all-programmatic",
+            categories: e
+          }
+        })
+      );
+
       window.location.reload();
     };
   }
 
-  async function start() {
-    if (isGeoOpt) {
-      isOptOut = await resolveGeoOptOut();
-    }
-    init();
-  }
+  "loading" === document.readyState
+    ? document.addEventListener("DOMContentLoaded", f)
+    : f();
 
-  // Initialize when DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', start);
-  } else {
-    start();
-  }
-})();
+}();
